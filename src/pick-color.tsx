@@ -1,7 +1,7 @@
 import { Clipboard, closeMainWindow, showHUD } from "@raycast/api";
 import { addColorToHistory } from "./storage";
 import { isValidHex } from "./utils";
-import { pickColor } from "swift:ColorPicker";
+import { pickColor } from "swift:../swift";
 
 /**
  * Pick Color command (no-view mode).
