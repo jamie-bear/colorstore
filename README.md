@@ -31,9 +31,8 @@ The **Manage Palettes** command lets you organize colors into named collections.
 
 ## Installation
 
-### From Raycast Store
-
-Search for "Color Store" in the Raycast Store and install it.
+> **Note:** This extension has not yet been submitted to the Raycast Store.
+> See [Publishing to the Raycast Store](#publishing-to-the-raycast-store) for the steps required to list it.
 
 ### From Source
 
@@ -124,6 +123,42 @@ Tests use [Vitest](https://vitest.dev) and mock the Raycast API's `LocalStorage`
 | `⌘ H`                 | Palette detail   | Add from history    |
 | `⌃ X`                 | Any color item   | Delete / remove     |
 | `⌃ ⇧ X`              | Color history    | Clear all history   |
+
+## Publishing to the Raycast Store
+
+Raycast extensions are distributed through the official [raycast/extensions](https://github.com/raycast/extensions) monorepo. To get Color Store listed:
+
+### 1. Prepare assets (currently missing)
+
+| Asset | Requirement |
+|-------|------------|
+| `assets/extension-icon.png` | 512×512 PNG, required |
+| `metadata/<name>-1.png` | At least one 2560×1600 PNG screenshot |
+
+### 2. Fork the monorepo
+
+```bash
+# Fork https://github.com/raycast/extensions on GitHub, then:
+git clone https://github.com/<your-handle>/extensions.git
+cp -r /path/to/colorstore extensions/extensions/colorstore
+```
+
+### 3. Set the correct author
+
+Update `package.json` so `"author"` matches your [raycast.com](https://raycast.com) developer handle.
+
+### 4. Verify the build
+
+```bash
+npm install
+npm run build   # must succeed (compiles Swift binary + TypeScript)
+npm run lint    # must produce no errors
+npm test        # all tests must pass
+```
+
+### 5. Open a Pull Request
+
+Submit a PR against `raycast/extensions` following their [contribution guidelines](https://github.com/raycast/extensions/blob/main/CONTRIBUTING.md). The Raycast team reviews for quality, security, and store policy compliance. Once merged, the extension is immediately available in the Store.
 
 ## License
 
