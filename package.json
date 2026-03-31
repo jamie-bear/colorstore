@@ -1,0 +1,51 @@
+{
+  "$schema": "https://www.raycast.com/schemas/extension.json",
+  "name": "colorstore",
+  "title": "Color Store",
+  "description": "Pick colors from anywhere on screen, view color history, and organize colors into custom palettes",
+  "icon": "extension-icon.png",
+  "author": "jamie-bear",
+  "categories": ["Design Tools"],
+  "license": "MIT",
+  "commands": [
+    {
+      "name": "pick-color",
+      "title": "Pick Color",
+      "description": "Pick a color from anywhere on screen using a magnifying glass",
+      "mode": "no-view"
+    },
+    {
+      "name": "color-history",
+      "title": "Color History",
+      "description": "View recently picked colors (up to 30)",
+      "mode": "view"
+    },
+    {
+      "name": "manage-palettes",
+      "title": "Manage Palettes",
+      "description": "Create and manage custom color palettes",
+      "mode": "view"
+    }
+  ],
+  "dependencies": {
+    "@raycast/api": "^1.83.0",
+    "@raycast/utils": "^1.17.0"
+  },
+  "devDependencies": {
+    "@raycast/eslint-config": "^1.0.11",
+    "@types/node": "22.10.2",
+    "@types/react": "18.3.12",
+    "eslint": "^8.57.0",
+    "prettier": "^3.4.2",
+    "typescript": "^5.7.2",
+    "vitest": "^1.6.0"
+  },
+  "scripts": {
+    "build": "ray build",
+    "dev": "ray develop",
+    "fix-lint": "ray lint --fix",
+    "lint": "ray lint",
+    "publish": "npx @raycast/api@latest publish",
+    "test": "vitest run"
+  }
+}
