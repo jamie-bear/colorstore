@@ -109,17 +109,27 @@ export default function Command() {
 // --- Palette detail view ---
 
 function PaletteDetail({ palette, onChanged }: { palette: Palette; onChanged: () => void }) {
+  const { pop } = useNavigation();
   const { data: freshPalettes, revalidate } = usePromise(getPalettes);
-  const current = freshPalettes?.find((p) => p.id === palette.id) ?? palette;
+  const current = freshPalettes?.find((p) => p.id === palette.id);
 
   const refresh = () => {
     revalidate();
     onChanged();
   };
 
+  // Palette was deleted externally — go back to the list
+  if (freshPalettes && !current) {
+    pop();
+    onChanged();
+    return <List />;
+  }
+
+  const activePalette = current ?? palette;
+
   return (
-    <List navigationTitle={current.name} searchBarPlaceholder={`Search colors in ${current.name}...`}>
-      {current.colors.length === 0 ? (
+    <List navigationTitle={activePalette.name} searchBarPlaceholder={`Search colors in ${activePalette.name}...`}>
+      {activePalette.colors.length === 0 ? (
         <List.EmptyView
           title="No colors in this palette"
           description="Add colors using the actions below"
@@ -128,24 +138,24 @@ function PaletteDetail({ palette, onChanged }: { palette: Palette; onChanged: ()
               <Action.Push
                 title="Add Color Manually"
                 icon={Icon.Plus}
-                target={<AddColorForm paletteId={current.id} onAdded={refresh} />}
+                target={<AddColorForm paletteId={activePalette.id} onAdded={refresh} />}
               />
               <Action
                 title="Open Color Chooser"
                 icon={Icon.EyeDropper}
                 shortcut={{ modifiers: ["cmd", "shift"], key: "c" }}
-                onAction={() => openColorChooserForPalette(current.id, refresh)}
+                onAction={() => openColorChooserForPalette(activePalette.id, refresh)}
               />
               <Action.Push
                 title="Add from History"
                 icon={Icon.Clock}
-                target={<AddFromHistory paletteId={current.id} onAdded={refresh} />}
+                target={<AddFromHistory paletteId={activePalette.id} onAdded={refresh} />}
               />
             </ActionPanel>
           }
         />
       ) : (
-        current.colors.map((hex) => {
+        activePalette.colors.map((hex) => {
           const { r, g, b } = hexToRgb(hex);
           const label = getColorLabel(hex);
           return (
@@ -165,19 +175,19 @@ function PaletteDetail({ palette, onChanged }: { palette: Palette; onChanged: ()
                       title="Add Color Manually"
                       icon={Icon.Plus}
                       shortcut={{ modifiers: ["cmd"], key: "n" }}
-                      target={<AddColorForm paletteId={current.id} onAdded={refresh} />}
+                      target={<AddColorForm paletteId={activePalette.id} onAdded={refresh} />}
                     />
                     <Action
                       title="Open Color Chooser"
                       icon={Icon.EyeDropper}
                       shortcut={{ modifiers: ["cmd", "shift"], key: "c" }}
-                      onAction={() => openColorChooserForPalette(current.id, refresh)}
+                      onAction={() => openColorChooserForPalette(activePalette.id, refresh)}
                     />
                     <Action.Push
                       title="Add from History"
                       icon={Icon.Clock}
                       shortcut={{ modifiers: ["cmd"], key: "h" }}
-                      target={<AddFromHistory paletteId={current.id} onAdded={refresh} />}
+                      target={<AddFromHistory paletteId={activePalette.id} onAdded={refresh} />}
                     />
                   </ActionPanel.Section>
                   <ActionPanel.Section title="Manage">
@@ -187,7 +197,7 @@ function PaletteDetail({ palette, onChanged }: { palette: Palette; onChanged: ()
                       style={Action.Style.Destructive}
                       shortcut={{ modifiers: ["ctrl"], key: "x" }}
                       onAction={async () => {
-                        await removeColorFromPalette(current.id, hex);
+                        await removeColorFromPalette(activePalette.id, hex);
                         refresh();
                       }}
                     />
@@ -309,7 +319,13 @@ function AddColorForm({ paletteId, onAdded }: { paletteId: string; onAdded: () =
               let hex = values.hex.trim();
 
               // If hex is empty, try to build from RGB
-              if (!hex && values.r && values.g && values.b) {
+              const hasAnyRgb = values.r || values.g || values.b;
+              if (!hex && hasAnyRgb) {
+                const hasAllRgb = values.r && values.g && values.b;
+                if (!hasAllRgb) {
+                  await showToast({ style: Toast.Style.Failure, title: "Incomplete RGB", message: "Please fill in all three RGB fields" });
+                  return;
+                }
                 const r = parseInt(values.r, 10);
                 const g = parseInt(values.g, 10);
                 const b = parseInt(values.b, 10);
@@ -320,13 +336,18 @@ function AddColorForm({ paletteId, onAdded }: { paletteId: string; onAdded: () =
                 hex = `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1).toUpperCase()}`;
               }
 
+              if (!hex) {
+                await showToast({ style: Toast.Style.Failure, title: "Enter a hex color or RGB values" });
+                return;
+              }
+
               // Prepend # if missing
-              if (hex && !hex.startsWith("#")) {
+              if (!hex.startsWith("#")) {
                 hex = `#${hex}`;
               }
 
               if (!isValidHex(hex)) {
-                await showToast({ style: Toast.Style.Failure, title: "Invalid hex color" });
+                await showToast({ style: Toast.Style.Failure, title: "Invalid hex color", message: "Use format like #FF5500 or FF5500" });
                 return;
               }
 
