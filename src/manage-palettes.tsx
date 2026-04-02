@@ -2,7 +2,6 @@ import {
   Action,
   ActionPanel,
   Alert,
-  Clipboard,
   Color,
   Form,
   Icon,
@@ -135,7 +134,7 @@ function PaletteDetail({ palette, onChanged }: { palette: Palette; onChanged: ()
                 title="Open Color Chooser"
                 icon={Icon.EyeDropper}
                 shortcut={{ modifiers: ["cmd", "shift"], key: "c" }}
-                onAction={() => openColorChooserForPalette(current.id)}
+                onAction={() => openColorChooserForPalette(current.id, refresh)}
               />
               <Action.Push
                 title="Add from History"
@@ -172,7 +171,7 @@ function PaletteDetail({ palette, onChanged }: { palette: Palette; onChanged: ()
                       title="Open Color Chooser"
                       icon={Icon.EyeDropper}
                       shortcut={{ modifiers: ["cmd", "shift"], key: "c" }}
-                      onAction={() => openColorChooserForPalette(current.id)}
+                      onAction={() => openColorChooserForPalette(current.id, refresh)}
                     />
                     <Action.Push
                       title="Add from History"
@@ -269,7 +268,7 @@ function RenamePaletteForm({ palette, onRenamed }: { palette: Palette; onRenamed
 
 // --- Open native macOS color chooser and add result to palette ---
 
-async function openColorChooserForPalette(paletteId: string) {
+async function openColorChooserForPalette(paletteId: string, onAdded?: () => void) {
   await closeMainWindow();
 
   try {
@@ -286,6 +285,7 @@ async function openColorChooserForPalette(paletteId: string) {
 
     const normalized = normalizeHex(hex);
     await addColorToPalette(paletteId, normalized);
+    onAdded?.();
     await showHUD(`Added ${normalized} to palette`);
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
@@ -341,7 +341,12 @@ function AddColorForm({ paletteId, onAdded }: { paletteId: string; onAdded: () =
             title="Open Color Chooser"
             icon={Icon.EyeDropper}
             shortcut={{ modifiers: ["cmd", "shift"], key: "c" }}
-            onAction={() => openColorChooserForPalette(paletteId)}
+            onAction={() =>
+              openColorChooserForPalette(paletteId, () => {
+                onAdded();
+                pop();
+              })
+            }
           />
         </ActionPanel>
       }

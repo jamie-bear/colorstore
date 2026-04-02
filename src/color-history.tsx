@@ -51,9 +51,14 @@ export default function Command() {
                           title={`Add to "${palette.name}"`}
                           icon={Icon.Plus}
                           onAction={async () => {
-                            await addColorToPalette(palette.id, entry.hex);
-                            revalidatePalettes();
-                            await showToast({ style: Toast.Style.Success, title: `Added to ${palette.name}` });
+                            try {
+                              await addColorToPalette(palette.id, entry.hex);
+                              revalidatePalettes();
+                              await showToast({ style: Toast.Style.Success, title: `Added to ${palette.name}` });
+                            } catch {
+                              revalidatePalettes();
+                              await showToast({ style: Toast.Style.Failure, title: "Palette not found", message: "It may have been deleted" });
+                            }
                           }}
                         />
                       ))}
