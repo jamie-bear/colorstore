@@ -38,8 +38,9 @@ export async function addColorToHistory(hex: string): Promise<ColorEntry> {
 }
 
 export async function removeColorFromHistory(hex: string): Promise<void> {
+  const normalized = normalizeHex(hex);
   const history = await getColorHistory();
-  const updated = history.filter((c) => c.hex !== hex);
+  const updated = history.filter((c) => c.hex !== normalized);
   await LocalStorage.setItem(HISTORY_KEY, JSON.stringify(updated));
 }
 
@@ -112,7 +113,8 @@ export async function removeColorFromPalette(id: string, hex: string): Promise<v
   const palette = palettes.find((p) => p.id === id);
   if (!palette) throw new Error(`Palette not found: ${id}`);
 
-  palette.colors = palette.colors.filter((c) => c !== hex);
+  const normalized = normalizeHex(hex);
+  palette.colors = palette.colors.filter((c) => c !== normalized);
   palette.updatedAt = new Date().toISOString();
   await savePalettes(palettes);
 }
