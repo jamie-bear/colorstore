@@ -53,12 +53,31 @@ func chooseColor() async -> String {
             container.addSubview(doneButton)
             panel.accessoryView = container
 
+            func stopRunLoop() {
+                // stop() sets a flag; posting a dummy event ensures the loop
+                // processes it immediately rather than waiting for the next real event.
+                app.stop(nil)
+                let dummy = NSEvent.otherEvent(
+                    with: .applicationDefined,
+                    location: .zero,
+                    modifierFlags: [],
+                    timestamp: 0,
+                    windowNumber: 0,
+                    context: nil,
+                    subtype: 0,
+                    data1: 0,
+                    data2: 0
+                )!
+                app.postEvent(dummy, atStart: true)
+            }
+
             func resolveColor() {
                 guard !hasResumed else { return }
                 hasResumed = true
 
                 let color = panel.color
                 guard let rgbColor = color.usingColorSpace(.sRGB) else {
+                    stopRunLoop()
                     continuation.resume(returning: "")
                     return
                 }
@@ -67,6 +86,7 @@ func chooseColor() async -> String {
                 let g = Int(round(rgbColor.greenComponent * 255))
                 let b = Int(round(rgbColor.blueComponent * 255))
 
+                stopRunLoop()
                 continuation.resume(returning: String(format: "#%02X%02X%02X", r, g, b))
             }
 
@@ -89,6 +109,7 @@ func chooseColor() async -> String {
             }
 
             panel.makeKeyAndOrderFront(nil)
+            app.run()  // pump the AppKit event loop until stopRunLoop() is called
         }
     }
 }
