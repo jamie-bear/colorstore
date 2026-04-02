@@ -1,5 +1,11 @@
 import AppKit
+import ObjectiveC
 import RaycastSwiftMacros
+
+private final class ColorPanelActionTarget: NSObject {
+    var onDone: (() -> Void)?
+    @objc func done(_ sender: Any?) { onDone?() }
+}
 
 /// Launches the macOS native color sampler (magnifying glass cursor).
 /// Returns the picked color as a hex string (e.g. "#FF5500"),
@@ -71,12 +77,19 @@ func chooseColor() async -> String {
                 app.postEvent(dummy, atStart: true)
             }
 
-            func resolveColor() {
+            var observer: NSObjectProtocol?
+
+            func finish(with color: NSColor?) {
                 guard !hasResumed else { return }
                 hasResumed = true
 
-                let color = panel.color
-                guard let rgbColor = color.usingColorSpace(.sRGB) else {
+                if let obs = observer {
+                    NotificationCenter.default.removeObserver(obs)
+                    observer = nil
+                }
+
+                guard let color,
+                      let rgbColor = color.usingColorSpace(.sRGB) else {
                     stopRunLoop()
                     continuation.resume(returning: "")
                     return
@@ -90,22 +103,27 @@ func chooseColor() async -> String {
                 continuation.resume(returning: String(format: "#%02X%02X%02X", r, g, b))
             }
 
-            // Handle "Done" button click
-            doneButton.target = nil
-            doneButton.action = #selector(NSColorPanel.close)
+            // Done button: capture color *before* hiding the panel so we don't
+            // depend on reading it from the close notification (where the panel
+            // color can be stale or unconvertible).
+            let actionTarget = ColorPanelActionTarget()
+            actionTarget.onDone = {
+                let color = panel.color   // snapshot while panel is still live
+                panel.orderOut(nil)       // hide without triggering willCloseNotification
+                finish(with: color)
+            }
+            // NSButton holds a weak reference to its target; the GCD closure that
+            // is blocked inside app.run() keeps actionTarget alive for us.
+            doneButton.target = actionTarget
+            doneButton.action = #selector(ColorPanelActionTarget.done(_:))
 
-            // Handle panel close (both via Done button and window close button)
-            var observer: NSObjectProtocol?
+            // X button / programmatic close fall through to willCloseNotification.
             observer = NotificationCenter.default.addObserver(
                 forName: NSWindow.willCloseNotification,
                 object: panel,
                 queue: .main
             ) { _ in
-                if let obs = observer {
-                    NotificationCenter.default.removeObserver(obs)
-                    observer = nil
-                }
-                resolveColor()
+                finish(with: panel.color)
             }
 
             panel.makeKeyAndOrderFront(nil)
