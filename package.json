@@ -5,7 +5,9 @@
   "description": "Pick colors from anywhere on screen, view color history, and organize colors into custom palettes",
   "icon": "extension-icon.png",
   "author": "jamie-bear",
-  "categories": ["Design Tools"],
+  "categories": [
+    "Design Tools"
+  ],
   "license": "MIT",
   "commands": [
     {
