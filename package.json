@@ -3,7 +3,7 @@
   "name": "colorstore",
   "title": "Color Store",
   "description": "Pick colors from anywhere on screen, view color history, and organize colors into custom palettes",
-  "icon": "extension-icon.png",
+  "icon": "assets/colorstore-icon.png",
   "author": "jamie-bear",
   "categories": [
     "Design Tools"
