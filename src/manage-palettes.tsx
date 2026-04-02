@@ -134,7 +134,7 @@ function PaletteDetail({ palette, onChanged }: { palette: Palette; onChanged: ()
               <Action
                 title="Open Color Chooser"
                 icon={Icon.EyeDropper}
-                shortcut={{ modifiers: ["cmd"], key: "k" }}
+                shortcut={{ modifiers: ["cmd", "shift"], key: "c" }}
                 onAction={() => openColorChooserForPalette(current.id)}
               />
               <Action.Push
@@ -171,7 +171,7 @@ function PaletteDetail({ palette, onChanged }: { palette: Palette; onChanged: ()
                     <Action
                       title="Open Color Chooser"
                       icon={Icon.EyeDropper}
-                      shortcut={{ modifiers: ["cmd"], key: "k" }}
+                      shortcut={{ modifiers: ["cmd", "shift"], key: "c" }}
                       onAction={() => openColorChooserForPalette(current.id)}
                     />
                     <Action.Push
@@ -340,13 +340,13 @@ function AddColorForm({ paletteId, onAdded }: { paletteId: string; onAdded: () =
           <Action
             title="Open Color Chooser"
             icon={Icon.EyeDropper}
-            shortcut={{ modifiers: ["cmd"], key: "k" }}
+            shortcut={{ modifiers: ["cmd", "shift"], key: "c" }}
             onAction={() => openColorChooserForPalette(paletteId)}
           />
         </ActionPanel>
       }
     >
-      <Form.Description text="Enter a hex color or RGB values, or open the Color Chooser (⌘K)" />
+      <Form.Description text="Enter a hex color or RGB values, or open the Color Chooser (⌘⇧C)" />
       <Form.TextField id="hex" title="Hex Color" placeholder="#FF5500" />
       <Form.Separator />
       <Form.TextField id="r" title="Red (0-255)" placeholder="255" />
