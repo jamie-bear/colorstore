@@ -81,11 +81,23 @@ func chooseColor() async -> String {
             container.addSubview(doneButton)
             panel.accessoryView = container
 
-            // CFRunLoopStop is more reliable than NSApplication.stop() in a
-            // plugin subprocess: it stops the run loop immediately without
-            // needing a dummy event to flush a "stop requested" flag.
             func stopRunLoop() {
-                CFRunLoopStop(RunLoop.main.getCFRunLoop())
+                // app.stop() sets a flag that is checked at the next event; post a
+                // dummy event so the flag is seen immediately rather than waiting
+                // for the next real user interaction.
+                app.stop(nil)
+                let dummy = NSEvent.otherEvent(
+                    with: .applicationDefined,
+                    location: .zero,
+                    modifierFlags: [],
+                    timestamp: 0,
+                    windowNumber: 0,
+                    context: nil,
+                    subtype: 0,
+                    data1: 0,
+                    data2: 0
+                )!
+                app.postEvent(dummy, atStart: true)
             }
 
             var observer: NSObjectProtocol?
@@ -139,13 +151,11 @@ func chooseColor() async -> String {
 
             panel.makeKeyAndOrderFront(nil)
 
-            // RunLoop.main.run(until:) is more reliable than NSApplication.run()
-            // in a Raycast plugin subprocess: NSApplication.run() can return early
-            // if the app object thinks it is already running or not yet launched,
-            // which would deallocate stack-local objects and silently break the
-            // Done button. RunLoop.main.run(until:) unconditionally pumps the main
-            // run loop until CFRunLoopStop() is called from finish().
-            RunLoop.main.run(until: .distantFuture)
+            // NSApplication.run() is required (not just RunLoop.main.run) because
+            // AppKit dispatches NSEvents — mouse clicks, keyboard — through
+            // NSApplication.nextEvent(matching:), which RunLoop alone does not call.
+            // Without app.run() the window appears but is completely unresponsive.
+            app.run()
         }
     }
 }
