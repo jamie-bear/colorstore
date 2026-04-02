@@ -34,8 +34,9 @@ func chooseColor() async -> String {
         var hasResumed = false
 
         DispatchQueue.main.async {
-            NSApp.setActivationPolicy(.accessory)
-            NSApp.activate(ignoringOtherApps: true)
+            let app = NSApplication.shared
+            app.setActivationPolicy(.accessory)
+            app.activate(ignoringOtherApps: true)
 
             let panel = NSColorPanel.shared
             panel.isContinuous = true
