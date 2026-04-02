@@ -4,7 +4,16 @@ import RaycastSwiftMacros
 
 private final class ColorPanelActionTarget: NSObject {
     var onDone: (() -> Void)?
+    var lastHex: String = ""
+
     @objc func done(_ sender: Any?) { onDone?() }
+
+    @objc func colorChanged(_ sender: Any?) {
+        if let panel = sender as? NSColorPanel,
+           let hex = nsColorToHex(panel.color) {
+            lastHex = hex
+        }
+    }
 }
 
 // Stable key for objc_setAssociatedObject — must be a pointer-sized value at a
@@ -55,7 +64,7 @@ private func nsColorToHex(_ color: NSColor) -> String? {
 
 /// Opens the macOS native color panel (full color chooser with color wheel,
 /// sliders, spectrum, etc.). Returns the chosen color as a hex string when
-/// the user closes the panel, or an empty string if cancelled/invalid.
+/// the user clicks Done, or an empty string if cancelled.
 @raycast
 func chooseColor() async -> String {
     await withCheckedContinuation { continuation in
@@ -82,9 +91,6 @@ func chooseColor() async -> String {
             panel.accessoryView = container
 
             func stopRunLoop() {
-                // app.stop() sets a flag that is checked at the next event; post a
-                // dummy event so the flag is seen immediately rather than waiting
-                // for the next real user interaction.
                 app.stop(nil)
                 let dummy = NSEvent.otherEvent(
                     with: .applicationDefined,
@@ -102,7 +108,7 @@ func chooseColor() async -> String {
 
             var observer: NSObjectProtocol?
 
-            func finish(with color: NSColor?) {
+            func resume(returning hex: String) {
                 guard !hasResumed else { return }
                 hasResumed = true
 
@@ -110,51 +116,50 @@ func chooseColor() async -> String {
                     NotificationCenter.default.removeObserver(obs)
                     observer = nil
                 }
-                // Clear the retained target so it can be released after we finish.
+                panel.setTarget(nil)
+                panel.setAction(nil)
                 objc_setAssociatedObject(panel, &colorPanelTargetKey, nil, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
-
-                guard let color, let hex = nsColorToHex(color) else {
-                    stopRunLoop()
-                    continuation.resume(returning: "")
-                    return
-                }
 
                 stopRunLoop()
                 continuation.resume(returning: hex)
             }
 
-            // Done button: use a direct target-action so we read panel.color
-            // before the panel is hidden/closed (reading it inside
-            // willCloseNotification is too late and can yield an unconvertible color).
+            // Use a single action target for both color tracking and Done.
+            // NSColorPanel's own target/action fires on every color change
+            // (isContinuous = true), so we always have the latest valid hex
+            // without needing to read panel.color at close time.
             let actionTarget = ColorPanelActionTarget()
+            actionTarget.lastHex = nsColorToHex(panel.color) ?? ""
+
+            // Wire the panel's color-changed action to continuously track the color.
+            panel.setTarget(actionTarget)
+            panel.setAction(#selector(ColorPanelActionTarget.colorChanged(_:)))
+
             actionTarget.onDone = {
-                let color = panel.color   // snapshot while panel is fully live
-                finish(with: color)       // resume first — also removes the observer
-                panel.orderOut(nil)       // hide after resuming so a stray willCloseNotification can't race
+                let hex = actionTarget.lastHex
+                panel.orderOut(nil)
+                resume(returning: hex)
             }
-            // NSButton holds only a weak reference to its target. Pin actionTarget
-            // to the panel (a long-lived singleton) so it cannot be deallocated
-            // while the panel is visible, regardless of whether app.run() or
-            // RunLoop.main.run() keeps the GCD block on the stack.
+
+            // Pin actionTarget so the weak button target reference stays alive.
             objc_setAssociatedObject(panel, &colorPanelTargetKey, actionTarget, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
             doneButton.target = actionTarget
             doneButton.action = #selector(ColorPanelActionTarget.done(_:))
 
-            // X button / programmatic close falls through to willCloseNotification.
+            // X button / programmatic close → cancel.
             observer = NotificationCenter.default.addObserver(
                 forName: NSWindow.willCloseNotification,
                 object: panel,
                 queue: .main
             ) { _ in
-                finish(with: panel.color)
+                resume(returning: "")
             }
 
             panel.makeKeyAndOrderFront(nil)
 
             // NSApplication.run() is required (not just RunLoop.main.run) because
-            // AppKit dispatches NSEvents — mouse clicks, keyboard — through
-            // NSApplication.nextEvent(matching:), which RunLoop alone does not call.
-            // Without app.run() the window appears but is completely unresponsive.
+            // AppKit dispatches NSEvents through NSApplication.nextEvent(matching:),
+            // which RunLoop alone does not call.
             app.run()
         }
     }
