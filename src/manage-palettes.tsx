@@ -5,11 +5,12 @@ import {
   Clipboard,
   Color,
   Form,
-  Grid,
   Icon,
   List,
   Toast,
+  closeMainWindow,
   confirmAlert,
+  showHUD,
   showToast,
   useNavigation,
 } from "@raycast/api";
@@ -23,8 +24,9 @@ import {
   removeColorFromPalette,
   getColorHistory,
 } from "./storage";
-import { getColorLabel, hexToRgb, isValidHex, normalizeHex, rgbToHex } from "./utils";
+import { getColorLabel, hexToRgb, isValidHex, normalizeHex } from "./utils";
 import { Palette } from "./types";
+import { chooseColor } from "swift:../swift";
 
 // --- Main palette list ---
 
@@ -129,11 +131,11 @@ function PaletteDetail({ palette, onChanged }: { palette: Palette; onChanged: ()
                 icon={Icon.Plus}
                 target={<AddColorForm paletteId={current.id} onAdded={refresh} />}
               />
-              <Action.Push
+              <Action
                 title="Open Color Chooser"
                 icon={Icon.EyeDropper}
                 shortcut={{ modifiers: ["cmd"], key: "k" }}
-                target={<ColorChooser paletteId={current.id} onAdded={refresh} />}
+                onAction={() => openColorChooserForPalette(current.id)}
               />
               <Action.Push
                 title="Add from History"
@@ -166,11 +168,11 @@ function PaletteDetail({ palette, onChanged }: { palette: Palette; onChanged: ()
                       shortcut={{ modifiers: ["cmd"], key: "n" }}
                       target={<AddColorForm paletteId={current.id} onAdded={refresh} />}
                     />
-                    <Action.Push
+                    <Action
                       title="Open Color Chooser"
                       icon={Icon.EyeDropper}
                       shortcut={{ modifiers: ["cmd"], key: "k" }}
-                      target={<ColorChooser paletteId={current.id} onAdded={refresh} />}
+                      onAction={() => openColorChooserForPalette(current.id)}
                     />
                     <Action.Push
                       title="Add from History"
@@ -265,111 +267,30 @@ function RenamePaletteForm({ palette, onRenamed }: { palette: Palette; onRenamed
   );
 }
 
-// --- HSL to hex helper ---
+// --- Open native macOS color chooser and add result to palette ---
 
-function hslToHex(h: number, s: number, l: number): string {
-  const c = (1 - Math.abs(2 * l - 1)) * s;
-  const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
-  const m = l - c / 2;
-  let r = 0, g = 0, b = 0;
-  if (h < 60) { r = c; g = x; }
-  else if (h < 120) { r = x; g = c; }
-  else if (h < 180) { g = c; b = x; }
-  else if (h < 240) { g = x; b = c; }
-  else if (h < 300) { r = x; b = c; }
-  else { r = c; b = x; }
-  return rgbToHex(
-    Math.round((r + m) * 255),
-    Math.round((g + m) * 255),
-    Math.round((b + m) * 255),
-  );
-}
+async function openColorChooserForPalette(paletteId: string) {
+  await closeMainWindow();
 
-// --- Generate color palette for the chooser ---
+  try {
+    const hex = await chooseColor();
 
-function generateColorPalette(): { section: string; colors: string[] }[] {
-  const sections: { section: string; colors: string[] }[] = [];
-
-  // Grayscale row
-  const grays: string[] = [];
-  for (let i = 0; i <= 10; i++) {
-    const v = Math.round((i / 10) * 255);
-    grays.push(rgbToHex(v, v, v));
-  }
-  sections.push({ section: "Grayscale", colors: grays });
-
-  // Hue sections with varying lightness and saturation
-  const hueNames: [string, number][] = [
-    ["Red", 0], ["Orange", 30], ["Yellow", 55], ["Lime", 80],
-    ["Green", 120], ["Teal", 160], ["Cyan", 185], ["Sky Blue", 200],
-    ["Blue", 225], ["Indigo", 255], ["Purple", 280], ["Magenta", 310], ["Pink", 340],
-  ];
-
-  for (const [name, hue] of hueNames) {
-    const colors: string[] = [];
-    // Light to dark at full saturation
-    for (const l of [0.92, 0.82, 0.72, 0.62, 0.5, 0.42, 0.32, 0.22, 0.14]) {
-      colors.push(hslToHex(hue, 1.0, l));
+    if (!hex || !isValidHex(hex)) {
+      if (!hex) {
+        await showHUD("Color chooser cancelled");
+      } else {
+        await showHUD(`Unexpected color format: ${hex}`);
+      }
+      return;
     }
-    // Desaturated variants at medium lightness
-    for (const s of [0.7, 0.4]) {
-      colors.push(hslToHex(hue, s, 0.5));
-    }
-    sections.push({ section: name, colors });
+
+    const normalized = normalizeHex(hex);
+    await addColorToPalette(paletteId, normalized);
+    await showHUD(`Added ${normalized} to palette`);
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    await showHUD(`Failed to choose color: ${message}`);
   }
-
-  return sections;
-}
-
-const COLOR_PALETTE = generateColorPalette();
-
-// --- Visual color chooser grid ---
-
-function ColorChooser({ paletteId, onAdded }: { paletteId: string; onAdded: () => void }) {
-  const { pop } = useNavigation();
-
-  return (
-    <Grid
-      navigationTitle="Color Chooser"
-      searchBarPlaceholder="Search colors by name or hex..."
-      columns={11}
-      inset={Grid.Inset.Small}
-    >
-      {COLOR_PALETTE.map(({ section, colors }) => (
-        <Grid.Section key={section} title={section}>
-          {colors.map((hex) => {
-            const { r, g, b } = hexToRgb(hex);
-            const label = getColorLabel(hex);
-            return (
-              <Grid.Item
-                key={`${section}-${hex}`}
-                content={{ color: { light: hex, dark: hex, adjustContrast: false } }}
-                title={hex}
-                subtitle={label}
-                keywords={[label, hex, `rgb ${r} ${g} ${b}`]}
-                actions={
-                  <ActionPanel>
-                    <Action
-                      title="Add to Palette"
-                      icon={Icon.Plus}
-                      onAction={async () => {
-                        await addColorToPalette(paletteId, hex);
-                        onAdded();
-                        pop();
-                        await showToast({ style: Toast.Style.Success, title: `Added ${hex}` });
-                      }}
-                    />
-                    <Action.CopyToClipboard title="Copy Hex" content={hex} shortcut={{ modifiers: ["cmd"], key: "c" }} />
-                    <Action.CopyToClipboard title="Copy RGB" content={`rgb(${r}, ${g}, ${b})`} shortcut={{ modifiers: ["cmd", "shift"], key: "c" }} />
-                  </ActionPanel>
-                }
-              />
-            );
-          })}
-        </Grid.Section>
-      ))}
-    </Grid>
-  );
 }
 
 // --- Add color manually form ---
@@ -416,11 +337,11 @@ function AddColorForm({ paletteId, onAdded }: { paletteId: string; onAdded: () =
               await showToast({ style: Toast.Style.Success, title: `Added ${normalized}` });
             }}
           />
-          <Action.Push
+          <Action
             title="Open Color Chooser"
             icon={Icon.EyeDropper}
             shortcut={{ modifiers: ["cmd"], key: "k" }}
-            target={<ColorChooser paletteId={paletteId} onAdded={onAdded} />}
+            onAction={() => openColorChooserForPalette(paletteId)}
           />
         </ActionPanel>
       }
