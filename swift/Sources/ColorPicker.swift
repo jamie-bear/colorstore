@@ -129,8 +129,8 @@ func chooseColor() async -> String {
             let actionTarget = ColorPanelActionTarget()
             actionTarget.onDone = {
                 let color = panel.color   // snapshot while panel is fully live
-                panel.orderOut(nil)       // hide; does NOT fire willCloseNotification
-                finish(with: color)
+                finish(with: color)       // resume first — also removes the observer
+                panel.orderOut(nil)       // hide after resuming so a stray willCloseNotification can't race
             }
             // NSButton holds only a weak reference to its target. Pin actionTarget
             // to the panel (a long-lived singleton) so it cannot be deallocated
